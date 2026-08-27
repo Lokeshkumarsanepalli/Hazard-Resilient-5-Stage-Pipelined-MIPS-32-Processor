@@ -1,5 +1,5 @@
 # Design
-set ::env(DESIGN_NAME) "mips"
+set ::env(DESIGN_NAME) "mips_pipeline"
 set ::env(VERILOG_FILES) "./designs/mips/src/mips.v"
 set ::env(SDC_FILE) "./designs/mips/src/mips.sdc"
 set ::env(CLOCK_PERIOD) "10.000"
