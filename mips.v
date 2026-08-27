@@ -11,14 +11,14 @@
 //   data_memory.v
 //   forwarding_unit.v
 //   hazard_detection_unit.v
-//   instruction_memory.v
+//   instruction_memory.v   (SYNTHESIS-SAFE VERSION -- program hardcoded,
+//                            no $readmemh / no external file dependency)
 //   register_file.v
 //   sign_extend.v
-//   mips_pipeline.v   (top-level module: mips_pipeline)
+//   mips_pipeline.v        (top-level module: mips_pipeline)
 //
 // Note: This file intentionally omits the testbench (tb_mips_pipeline.v) so
-// it can be used as a pure synthesizable design source. Simulate against the
-// original testbench file separately.
+// it can be used as a pure synthesizable design source.
 // ============================================================================
 
 
@@ -313,14 +313,20 @@ endmodule
 // Harvard-style INSTRUCTION memory (separate from data memory).
 // Word-addressed internally; the PC is a byte address so we index with
 // addr[?:2]. Combinational read (fetch happens within the IF stage).
-// The program is loaded from a hex file via $readmemh.
+//
+// NOTE: The program is now hardcoded directly into the Verilog as explicit
+// mem[i] assignments instead of being loaded at runtime via $readmemh from
+// "program.hex". This removes the file-I/O dependency entirely, so
+// synthesis tools (Yosys/OpenLane, etc.) no longer need to resolve any
+// external file path -- eliminating the
+// "Can not open file `program.hex` for $readmemh" synthesis error.
+// The instruction values below are copied verbatim from program.hex.
 // ============================================================================
 
 // https://www.dsi.unive.it/~gasparetto/materials/MIPS_Instruction_Set.pdf
 
 module instruction_memory #(
-    parameter WORDS    = 256,                 // 256 instructions
-    parameter PROGFILE = "program.hex"
+    parameter WORDS = 256                 // 256 instructions
 )(
     input      [31:0] addr,        // byte address (from PC)
     output     [31:0] instr
@@ -329,8 +335,37 @@ module instruction_memory #(
     integer i;
 
     initial begin
-        for (i = 0; i < WORDS; i = i + 1) mem[i] = 32'h0000_0000; // NOP fill
-        $readmemh(PROGFILE, mem);
+        // Program instructions (from program.hex)
+        mem[0]  = 32'h20010005;
+        mem[1]  = 32'h20020003;
+        mem[2]  = 32'h00221820;
+        mem[3]  = 32'h00622022;
+        mem[4]  = 32'h00642825;
+        mem[5]  = 32'h00a13024;
+        mem[6]  = 32'h0041382a;
+        mem[7]  = 32'hac030000;
+        mem[8]  = 32'h8c080000;
+        mem[9]  = 32'h01014820;
+        mem[10] = 32'h10210002;
+        mem[11] = 32'h200a0063;
+        mem[12] = 32'h200b0058;
+        mem[13] = 32'h200c0007;
+        mem[14] = 32'h14220002;
+        mem[15] = 32'h200d0037;
+        mem[16] = 32'h2011004d;
+        mem[17] = 32'h200e0009;
+        mem[18] = 32'h08000014;
+        mem[19] = 32'h200f007b;
+        mem[20] = 32'h2010002a;
+        mem[21] = 32'hac090004;
+        mem[22] = 32'h00000000;
+        mem[23] = 32'h00000000;
+        mem[24] = 32'h00000000;
+        mem[25] = 32'h00000000;
+        mem[26] = 32'h00000000;
+
+        // Fill remaining words with NOP (0x00000000)
+        for (i = 27; i < WORDS; i = i + 1) mem[i] = 32'h0000_0000;
     end
 
     assign instr = mem[addr[31:2]]; // divide byte address by 4
@@ -412,9 +447,7 @@ endmodule
 // This file also declares the four pipeline registers (as `reg`s updated in
 // clocked always blocks) and instantiates every functional unit.
 // ============================================================================
-module mips_pipeline #(
-    parameter PROGFILE = "program.hex"
-)(
+module mips_pipeline (
     input clk,
     input reset
 );
@@ -425,7 +458,7 @@ module mips_pipeline #(
     wire [31:0] pc_plus4 = pc + 32'd4;
     wire [31:0] instr;
 
-    instruction_memory #(.PROGFILE(PROGFILE)) imem (
+    instruction_memory imem (
         .addr (pc),
         .instr(instr)
     );
